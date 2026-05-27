@@ -1,0 +1,7 @@
+streamlit
+supabase
+pandas
+matplotlib
+seaborn
+python-docx
+xlsxwriter
