@@ -140,7 +140,7 @@ def build_doc(df_export):
     doc.add_paragraph(f"期間：{start_date} ～ {end_date}")
     doc.add_paragraph("")
 
-    # KPI（完全版）
+    # 1. KPI
     doc.add_heading("1. KPI（重要指標：月次比較）", level=2)
     doc.add_paragraph("■ 月ごとの件数・前月比")
     for _, row in monthly_counts.iterrows():
@@ -153,32 +153,29 @@ def build_doc(df_export):
     doc.add_picture(fig_to_png_bytes(fig_monthly), width=Inches(6))
     doc.add_paragraph("")
 
-    # 集計サマリ
+    # 2. 集計サマリ（期間全体）
     doc.add_heading("2. 集計サマリ", level=2)
     doc.add_paragraph(f"総件数：{len(df_export)} 件")
 
-    # 場所別
     by_loc = df_export.groupby("場所")["ID"].count().reset_index().sort_values("ID", ascending=False)
     doc.add_paragraph("■ 場所別件数")
     for _, row in by_loc.iterrows():
         doc.add_paragraph(f"- {row['場所']}：{row['ID']} 件", style="List Bullet")
     doc.add_paragraph("")
 
-    # カテゴリ別
     by_cat = df_export.groupby("カテゴリ")["ID"].count().reset_index().sort_values("ID", ascending=False)
     doc.add_paragraph("■ カテゴリ別件数")
     for _, row in by_cat.iterrows():
         doc.add_paragraph(f"- {row['カテゴリ']}：{row['ID']} 件", style="List Bullet")
     doc.add_paragraph("")
 
-    # 会社別
     by_company = df_export.groupby("会社名")["ID"].count().reset_index().sort_values("ID", ascending=False)
     doc.add_paragraph("■ 会社別件数")
     for _, row in by_company.iterrows():
         doc.add_paragraph(f"- {row['会社名']}：{row['ID']} 件", style="List Bullet")
     doc.add_paragraph("")
 
-    # グラフ
+    # 3. グラフ（期間全体）
     doc.add_heading("3. グラフ", level=2)
     for title, fig in [
         ("時間帯別件数", fig_time),
@@ -190,7 +187,7 @@ def build_doc(df_export):
         doc.add_paragraph(f"■ {title}")
         doc.add_picture(fig_to_png_bytes(fig), width=Inches(6))
 
-    # ヒートマップ
+    # 4. ヒートマップ（期間全体）
     doc.add_heading("4. ヒートマップ", level=2)
     doc.add_paragraph("■ 曜日 × 時間帯")
     doc.add_picture(fig_to_png_bytes(fig_heat_week), width=Inches(6))
@@ -198,7 +195,7 @@ def build_doc(df_export):
     doc.add_paragraph("■ 場所 × 時間帯")
     doc.add_picture(fig_to_png_bytes(fig_heat_loc), width=Inches(6))
 
-    # 個別事例
+    # 5. 個別事例一覧
     doc.add_heading("5. 個別事例一覧", level=2)
     for _, row in df_export.sort_values("発生日時").iterrows():
         doc.add_paragraph(f"[ID {row['ID']}] {row['発生日時']}")
@@ -207,6 +204,53 @@ def build_doc(df_export):
         doc.add_paragraph(f"内容：{row['内容']}")
         doc.add_paragraph(f"投稿者：{row['投稿者']}")
         doc.add_paragraph("-" * 40)
+
+    # 6. 月別サマリ・月別グラフ
+    doc.add_heading("6. 月別サマリ・月別グラフ", level=2)
+
+    for month in monthly_counts["月"].unique():
+        doc.add_heading(f"■ {month} のサマリ", level=3)
+
+        df_month = df_export[df_export["月"] == month]
+
+        doc.add_paragraph(f"- 件数：{len(df_month)} 件")
+
+        by_loc_m = df_month.groupby("場所")["ID"].count().reset_index().sort_values("ID", ascending=False)
+        doc.add_paragraph("・場所別件数")
+        for _, row in by_loc_m.iterrows():
+            doc.add_paragraph(f"  - {row['場所']}：{row['ID']} 件", style="List Bullet")
+
+        by_cat_m = df_month.groupby("カテゴリ")["ID"].count().reset_index().sort_values("ID", ascending=False)
+        doc.add_paragraph("・カテゴリ別件数")
+        for _, row in by_cat_m.iterrows():
+            doc.add_paragraph(f"  - {row['カテゴリ']}：{row['ID']} 件", style="List Bullet")
+
+        by_company_m = df_month.groupby("会社名")["ID"].count().reset_index().sort_values("ID", ascending=False)
+        doc.add_paragraph("・会社別件数")
+        for _, row in by_company_m.iterrows():
+            doc.add_paragraph(f"  - {row['会社名']}：{row['ID']} 件", style="List Bullet")
+
+        doc.add_paragraph("")
+
+        doc.add_heading(f"■ {month} のグラフ", level=3)
+
+        fig_time_m = plot_bar(df_month, "時間帯", f"{month} 時間帯別件数")
+        fig_week_m = plot_bar(df_month, "曜日", f"{month} 曜日別件数")
+        fig_loc_m = plot_bar(df_month, "場所", f"{month} 場所別件数")
+        fig_cat_m = plot_bar(df_month, "カテゴリ", f"{month} カテゴリ別件数")
+        fig_company_m = plot_bar(df_month, "会社名", f"{month} 会社別件数")
+
+        for title, fig in [
+            (f"{month} 時間帯別件数", fig_time_m),
+            (f"{month} 曜日別件数", fig_week_m),
+            (f"{month} 場所別件数", fig_loc_m),
+            (f"{month} カテゴリ別件数", fig_cat_m),
+            (f"{month} 会社別件数", fig_company_m),
+        ]:
+            doc.add_paragraph(f"● {title}")
+            doc.add_picture(fig_to_png_bytes(fig), width=Inches(6))
+
+        doc.add_paragraph("")
 
     bio = BytesIO()
     doc.save(bio)
