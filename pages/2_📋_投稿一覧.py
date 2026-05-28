@@ -1,8 +1,9 @@
-from modules.font import *
 import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 import time
+
+from modules.font import *
 
 # ============================
 # Supabase 接続
@@ -64,14 +65,14 @@ df = pd.DataFrame([
         "カテゴリ": r["categories"]["name"] if r["categories"] else "",
         "内容": r["description"],
         "投稿者": r["reporter"],
-        "会社名": r["company"] if r["company"] else "（未入力）",  # ← 追加
+        "会社名": r["company"] if r["company"] else "（未入力）",
         "写真URL": r["photo_url"],
     }
     for r in reports
 ])
 
 # ============================
-# フィルタ UI（必要なら会社名フィルタも追加可能）
+# フィルタ UI
 # ============================
 
 st.subheader("🔍 フィルタ")
@@ -153,7 +154,7 @@ for _, row in page_df.iterrows():
             f"**カテゴリ:** {row['カテゴリ']}  \n"
             f"**内容:** {row['内容']}  \n"
             f"**投稿者:** {row['投稿者']}  \n"
-            f"**会社名:** {row['会社名']}"  # ← 追加
+            f"**会社名:** {row['会社名']}"
         )
 
     with colB:

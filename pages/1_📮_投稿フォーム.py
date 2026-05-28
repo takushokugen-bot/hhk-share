@@ -1,8 +1,9 @@
-from modules.font import *
 import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime
 import uuid
+
+from modules.font import *
 
 # ============================
 # Supabase 接続
@@ -34,7 +35,6 @@ reported_at = st.datetime_input("発生日時", datetime.now())
 location_name = st.selectbox("場所", location_names)
 category_name = st.selectbox("カテゴリ", category_names)
 
-# 会社名はマスタから選択（任意）
 company_name = st.selectbox(
     "会社名（任意）",
     ["（未選択）"] + company_names
@@ -46,7 +46,6 @@ company_name = st.selectbox(
 description = st.text_area("内容")
 reporter = st.text_input("投稿者名（任意）")
 
-# 写真アップロード
 uploaded_file = st.file_uploader("写真（任意）", type=["jpg", "jpeg", "png"])
 
 # ============================
@@ -64,7 +63,6 @@ if st.button("投稿する"):
 
     photo_url = None
 
-    # 写真がある場合は Storage にアップロード
     if uploaded_file is not None:
         file_bytes = uploaded_file.read()
         file_ext = uploaded_file.name.split(".")[-1]
@@ -76,10 +74,8 @@ if st.button("投稿する"):
             {"content-type": f"image/{file_ext}"}
         )
 
-        # 公開URLを取得
         photo_url = supabase.storage.from_("hhk_photos").get_public_url(file_name)
 
-    # DB に保存
     data = {
         "reported_at": reported_at.isoformat(),
         "location_id": location_id,

@@ -2,7 +2,11 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-font_path = "fonts/ipaexg.ttf"
+# ============================
+# 日本語フォント強制適用（完全版）
+# ============================
+
+font_path = "fonts/ipaexg.ttf"  # 追加したフォント
 jp_font = fm.FontProperties(fname=font_path)
 
 plt.rcParams["font.family"] = jp_font.get_name()

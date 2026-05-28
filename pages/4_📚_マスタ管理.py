@@ -1,7 +1,8 @@
-from modules.font import *
 import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
+
+from modules.font import *
 
 # ============================
 # Supabase 接続
@@ -139,7 +140,7 @@ with tab2:
             st.rerun()
 
 # ============================
-# 🏢 会社マスタ（NEW）
+# 🏢 会社マスタ
 # ============================
 
 with tab3:

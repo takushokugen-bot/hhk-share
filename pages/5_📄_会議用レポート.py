@@ -1,4 +1,3 @@
-from modules.font import *
 import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
@@ -8,6 +7,8 @@ from docx import Document
 from docx.shared import Inches
 from io import BytesIO
 import datetime as dt
+
+from modules.font import *   # ← フォント設定は必ず最後に import
 
 # ============================
 # Supabase 接続
@@ -154,7 +155,7 @@ def build_doc(df_export):
     doc.add_picture(fig_to_png_bytes(fig_monthly), width=Inches(6))
     doc.add_paragraph("")
 
-    # 2. 集計サマリ（期間全体）
+    # 2. 集計サマリ
     doc.add_heading("2. 集計サマリ", level=2)
     doc.add_paragraph(f"総件数：{len(df_export)} 件")
 
@@ -176,7 +177,7 @@ def build_doc(df_export):
         doc.add_paragraph(f"- {row['会社名']}：{row['ID']} 件", style="List Bullet")
     doc.add_paragraph("")
 
-    # 3. グラフ（期間全体）
+    # 3. グラフ
     doc.add_heading("3. グラフ", level=2)
     for title, fig in [
         ("時間帯別件数", fig_time),
@@ -188,7 +189,7 @@ def build_doc(df_export):
         doc.add_paragraph(f"■ {title}")
         doc.add_picture(fig_to_png_bytes(fig), width=Inches(6))
 
-    # 4. ヒートマップ（期間全体）
+    # 4. ヒートマップ
     doc.add_heading("4. ヒートマップ", level=2)
     doc.add_paragraph("■ 曜日 × 時間帯")
     doc.add_picture(fig_to_png_bytes(fig_heat_week), width=Inches(6))
