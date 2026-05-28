@@ -6,7 +6,8 @@ import json
 
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
-MODEL_NAME = "llama-3.1-70b-versatile"
+MODEL_NAME = "llama-3.1-70b-instruct"
+
 
 def summarize_reports(df: pd.DataFrame, max_samples: int = 50) -> str:
     if df.empty:
