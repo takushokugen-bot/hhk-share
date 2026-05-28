@@ -10,7 +10,7 @@ import matplotlib.font_manager as fm
 # 日本語フォント設定（完全体）
 # ============================
 
-font_path = "fonts/ipaexg.ttf"  # ← 弦のフォルダと完全一致
+font_path = "fonts/ipaexg.ttf"  # ← 弦のフォルダと一致
 
 # フォントを強制登録（Cloud で必須）
 fm.fontManager.addfont(font_path)
@@ -124,7 +124,7 @@ if filtered.empty:
     st.stop()
 
 # ============================
-# 月次KPI
+# 月次KPI用（月情報）
 # ============================
 
 monthly_counts = (
@@ -213,13 +213,16 @@ with colB:
     card("🏢 **会社別件数**：協力会社ごとの危険傾向を比較できます。")
 
 # ============================
-# ヒートマップ
+# ヒートマップ（曜日 × 時間帯 / 場所 × 時間帯）
 # ============================
 
 st.subheader("🔥 ヒートマップ（赤系）")
 
 pivot_week = filtered.pivot_table(index="曜日", columns="時間帯", aggfunc="size", fill_value=0)
 pivot_loc = filtered.pivot_table(index="場所", columns="時間帯", aggfunc="size", fill_value=0)
+
+fig_heat_week = None
+fig_heat_loc = None
 
 if not pivot_week.empty:
     fig_heat_week, ax = plt.subplots(figsize=(12, 6))
@@ -232,3 +235,216 @@ if not pivot_loc.empty:
     sns.heatmap(pivot_loc, cmap="Reds", annot=True, fmt="d", ax=ax2)
     ax2.set_title("場所 × 時間帯 ヒートマップ")
     st.pyplot(fig_heat_loc)
+
+# ============================
+# 会社 × 場所 × 時間帯 ヒートマップ（完全修正版）
+# ============================
+
+st.subheader("🔥 会社 × 場所 × 時間帯 ヒートマップ")
+
+# 「すべて」でも pivot を作る
+df_company = filtered.copy() if company_filter == "すべて" else filtered[filtered["会社名"] == company_filter]
+
+pivot_company = df_company.pivot_table(
+    index="場所",
+    columns="時間帯",
+    aggfunc="size",
+    fill_value=0
+)
+
+# pivot が空ならダミーを入れる（Excel 出力が壊れないように）
+if pivot_company.empty:
+    pivot_company = pd.DataFrame([[0]], index=["データなし"], columns=["データなし"])
+
+# ヒートマップ生成
+fig_company_heat, ax = plt.subplots(figsize=(12, 6))
+sns.heatmap(pivot_company, cmap="Reds", annot=True, fmt="d", ax=ax)
+ax.set_title(f"{company_filter}：場所 × 時間帯 ヒートマップ")
+st.pyplot(fig_company_heat)
+
+# ============================
+# Excel 出力
+# ============================
+
+def fig_to_png_bytes(fig):
+    buf = BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
+    return buf
+
+def to_excel_with_charts(df_export, p_week, p_loc,
+                         f_time, f_week, f_loc, f_cat,
+                         f_company,
+                         fh_week, fh_loc,
+                         fh_company,
+                         monthly_counts):
+
+    output = BytesIO()
+
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        workbook = writer.book
+
+        # 1. 元データ
+        df_export.to_excel(writer, index=False, sheet_name="元データ")
+
+        # 2. 期間全体ヒートマップ
+        p_week.to_excel(writer, sheet_name="曜日×時間帯")
+        p_loc.to_excel(writer, sheet_name="場所×時間帯")
+
+        # 3. 期間全体グラフ
+        sheet_chart = workbook.add_worksheet("全体グラフ")
+
+        row = 1
+        col = 1
+
+        def insert_if(fig, title):
+            nonlocal row
+            if fig is None:
+                return
+            png = fig_to_png_bytes(fig)
+            sheet_chart.insert_image(row, col, title + ".png", {"image_data": png})
+            row += 20
+
+        insert_if(f_time, "時間帯別件数")
+        insert_if(f_week, "曜日別件数")
+        insert_if(f_loc, "場所別件数")
+        insert_if(f_cat, "カテゴリ別件数")
+        insert_if(f_company, "会社別件数")
+        insert_if(fh_week, "曜日×時間帯ヒートマップ")
+        insert_if(fh_loc, "場所×時間帯ヒートマップ")
+        insert_if(fh_company, "会社×場所×時間帯ヒートマップ")
+
+        # 4. 月別シート（サマリ → グラフ → ヒートマップ）
+
+        for month in monthly_counts["月"].unique():
+
+            df_month = df_export[df_export["月"] == month]
+            sheet = workbook.add_worksheet(f"{month}")
+
+            row = 1
+            col = 1
+
+            # ---- サマリ ----
+            sheet.write(row, col, f"【{month} サマリ】")
+            row += 2
+
+            sheet.write(row, col, f"件数：{len(df_month)} 件")
+            row += 2
+
+            # 場所別
+            sheet.write(row, col, "■ 場所別件数")
+            row += 1
+            by_loc_m = df_month.groupby("場所")["ID"].count().reset_index().sort_values("ID", ascending=False)
+            for _, r in by_loc_m.iterrows():
+                sheet.write(row, col, f"- {r['場所']}：{r['ID']} 件")
+                row += 1
+            row += 1
+
+            # カテゴリ別
+            sheet.write(row, col, "■ カテゴリ別件数")
+            row += 1
+            by_cat_m = df_month.groupby("カテゴリ")["ID"].count().reset_index().sort_values("ID", ascending=False)
+            for _, r in by_cat_m.iterrows():
+                sheet.write(row, col, f"- {r['カテゴリ']}：{r['ID']} 件")
+                row += 1
+            row += 1
+
+            # 会社別
+            sheet.write(row, col, "■ 会社別件数")
+            row += 1
+            by_company_m = df_month.groupby("会社名")["ID"].count().reset_index().sort_values("ID", ascending=False)
+            for _, r in by_company_m.iterrows():
+                sheet.write(row, col, f"- {r['会社名']}：{r['ID']} 件")
+                row += 1
+            row += 2
+
+            # ---- グラフ ----
+            sheet.write(row, col, f"【{month} グラフ】")
+            row += 2
+
+            fig_time_m = None
+            fig_week_m = None
+            fig_loc_m = None
+            fig_cat_m = None
+            fig_company_m = None
+
+            if not df_month.empty:
+                fig_time_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="時間帯")
+                plt.title(f"{month} 時間帯別件数")
+                plt.xticks(rotation=90)
+
+                fig_week_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="曜日")
+                plt.title(f"{month} 曜日別件数")
+                plt.xticks(rotation=90)
+
+                fig_loc_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="場所")
+                plt.title(f"{month} 場所別件数")
+                plt.xticks(rotation=90)
+
+                fig_cat_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="カテゴリ")
+                plt.title(f"{month} カテゴリ別件数")
+                plt.xticks(rotation=90)
+
+                fig_company_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="会社名")
+                plt.title(f"{month} 会社別件数")
+                plt.xticks(rotation=90)
+
+            for title, fig in [
+                (f"{month} 時間帯別件数", fig_time_m),
+                (f"{month} 曜日別件数", fig_week_m),
+                (f"{month} 場所別件数", fig_loc_m),
+                (f"{month} カテゴリ別件数", fig_cat_m),
+                (f"{month} 会社別件数", fig_company_m),
+            ]:
+                if fig:
+                    png = fig_to_png_bytes(fig)
+                    sheet.insert_image(row, col, title + ".png", {"image_data": png})
+                    row += 20
+
+            # ---- ヒートマップ ----
+            sheet.write(row, col, f"【{month} ヒートマップ】")
+            row += 2
+
+            pivot_week_m = df_month.pivot_table(index="曜日", columns="時間帯", aggfunc="size", fill_value=0)
+            pivot_loc_m = df_month.pivot_table(index="場所", columns="時間帯", aggfunc="size", fill_value=0)
+
+            if not pivot_week_m.empty:
+                fig_hw_m, ax = plt.subplots(figsize=(10, 4))
+                sns.heatmap(pivot_week_m, cmap="Reds", annot=True, fmt="d", ax=ax)
+                ax.set_title(f"{month} 曜日×時間帯")
+                png = fig_to_png_bytes(fig_hw_m)
+                sheet.insert_image(row, col, f"{month}_heat_week.png", {"image_data": png})
+                row += 20
+
+            if not pivot_loc_m.empty:
+                fig_hl_m, ax = plt.subplots(figsize=(10, 4))
+                sns.heatmap(pivot_loc_m, cmap="Reds", annot=True, fmt="d", ax=ax)
+                ax.set_title(f"{month} 場所×時間帯")
+                png = fig_to_png_bytes(fig_hl_m)
+                sheet.insert_image(row, col, f"{month}_heat_loc.png", {"image_data": png})
+                row += 20
+
+    return output.getvalue()
+
+excel_data = to_excel_with_charts(
+    filtered,
+    pivot_week,
+    pivot_loc,
+    fig_time,
+    fig_week,
+    fig_loc,
+    fig_cat,
+    fig_company,
+    fig_heat_week,
+    fig_heat_loc,
+    fig_company_heat,
+    monthly_counts,
+)
+
+st.download_button(
+    label="📥 Excel ダウンロード（グラフ・ヒートマップ・月別シート
