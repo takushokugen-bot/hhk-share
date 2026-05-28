@@ -1,11 +1,10 @@
-# modules/ai_analysis.py
-
-import os
+import streamlit as st
 import requests
 import textwrap
 import pandas as pd
+import json
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")  # st.secrets に入れてもOK
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_NAME = "llama-3.1-70b-versatile"
 
@@ -34,9 +33,11 @@ def summarize_reports(df: pd.DataFrame, max_samples: int = 50) -> str:
         "model": MODEL_NAME,
         "messages": [
             {"role": "system", "content": "あなたは安全管理の専門家です。日本語で回答してください。"},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": user_prompt.strip()},
         ],
         "temperature": 0.2,
+        "max_tokens": 512,
+        "stream": False
     }
 
     headers = {
@@ -44,6 +45,9 @@ def summarize_reports(df: pd.DataFrame, max_samples: int = 50) -> str:
         "Content-Type": "application/json",
     }
 
-    resp = requests.post(GROQ_ENDPOINT, json=payload, headers=headers, timeout=60)
-    resp.raise_for_status()
+    resp = requests.post(GROQ_ENDPOINT, data=json.dumps(payload), headers=headers, timeout=60)
+
+    if resp.status_code != 200:
+        return f"❌ Groq API エラー: {resp.status_code}\n{resp.text}"
+
     return resp.json()["choices"][0]["message"]["content"].strip()
