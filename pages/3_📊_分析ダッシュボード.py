@@ -141,18 +141,43 @@ monthly_counts = (
 )
 
 # ============================
-# 月別AI要約生成
+# 月別AI要約（まとめて1回方式）
 # ============================
 
-def generate_monthly_ai_summaries(df_all: pd.DataFrame):
-    summaries = {}
+def generate_monthly_ai_summaries_single_call(df_all: pd.DataFrame):
     df_all = df_all.copy()
     df_all["year_month"] = df_all["発生日時"].dt.to_period("M")
-    for ym, group in df_all.groupby("year_month"):
-        summaries[str(ym)] = summarize_reports(group)
-    return summaries
 
-monthly_ai = generate_monthly_ai_summaries(filtered)
+    month_blocks = []
+    for ym, group in df_all.groupby("year_month"):
+        lines = []
+        for _, row in group.iterrows():
+            lines.append(
+                f"- 日時:{row['発生日時']} / 場所:{row['場所']} / "
+                f"カテゴリ:{row['カテゴリ']} / 会社:{row['会社名']} / 内容:{row['内容']}"
+            )
+        month_blocks.append(f"### {ym}\n" + "\n".join(lines))
+
+    prompt = (
+        "以下は月別のヒヤリハット一覧です。\n"
+        "各月ごとに『要点』『主な原因傾向』『注意すべきポイント』を日本語で要約してください。\n\n"
+        + "\n\n".join(month_blocks)
+    )
+
+    summary_text = summarize_reports(pd.DataFrame({"dummy": [prompt]}))
+
+    monthly_ai = {}
+    for ym in df_all["year_month"].unique():
+        ym_str = str(ym)
+        if ym_str in summary_text:
+            part = summary_text.split(ym_str)[1]
+            monthly_ai[ym_str] = part.strip()
+        else:
+            monthly_ai[ym_str] = "（この月のAI要約はありません）"
+
+    return monthly_ai
+
+monthly_ai = generate_monthly_ai_summaries_single_call(filtered)
 
 # ============================
 # カード風説明
