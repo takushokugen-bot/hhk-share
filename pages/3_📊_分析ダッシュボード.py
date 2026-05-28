@@ -78,6 +78,7 @@ df = pd.DataFrame([
 
 df["時間帯"] = df["発生日時"].dt.hour
 df["曜日"] = df["発生日時"].dt.day_name()
+df["月"] = df["発生日時"].dt.to_period("M").astype(str)
 
 # ============================
 # フィルタ
@@ -117,6 +118,17 @@ st.write(f"📌 抽出件数：{len(filtered)} 件")
 if filtered.empty:
     st.warning("この条件ではデータがありません。")
     st.stop()
+
+# ============================
+# 月次KPI用（月情報）
+# ============================
+
+monthly_counts = (
+    filtered.groupby("月")["ID"]
+    .count()
+    .reset_index()
+    .sort_values("月")
+)
 
 # ============================
 # カード風説明
@@ -256,8 +268,6 @@ else:
 # Excel 出力
 # ============================
 
-from xlsxwriter import Workbook
-
 def fig_to_png_bytes(fig):
     buf = BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
@@ -268,15 +278,23 @@ def to_excel_with_charts(df_export, p_week, p_loc,
                          f_time, f_week, f_loc, f_cat,
                          f_company,
                          fh_week, fh_loc,
-                         fh_company):
+                         fh_company,
+                         monthly_counts):
+
     output = BytesIO()
+
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        workbook = writer.book
+
+        # 1. 元データ
         df_export.to_excel(writer, index=False, sheet_name="元データ")
+
+        # 2. 期間全体ヒートマップ
         p_week.to_excel(writer, sheet_name="曜日×時間帯")
         p_loc.to_excel(writer, sheet_name="場所×時間帯")
 
-        workbook = writer.book
-        sheet_chart = workbook.add_worksheet("グラフ")
+        # 3. 期間全体グラフ
+        sheet_chart = workbook.add_worksheet("全体グラフ")
 
         row = 1
         col = 1
@@ -298,6 +316,121 @@ def to_excel_with_charts(df_export, p_week, p_loc,
         insert_if(fh_loc, "場所×時間帯ヒートマップ")
         insert_if(fh_company, "会社×場所×時間帯ヒートマップ")
 
+        # 4. 月別シート（サマリ → グラフ → ヒートマップ）
+
+        for month in monthly_counts["月"].unique():
+
+            df_month = df_export[df_export["月"] == month]
+            sheet = workbook.add_worksheet(f"{month}")
+
+            row = 1
+            col = 1
+
+            # ---- サマリ ----
+            sheet.write(row, col, f"【{month} サマリ】")
+            row += 2
+
+            sheet.write(row, col, f"件数：{len(df_month)} 件")
+            row += 2
+
+            # 場所別
+            sheet.write(row, col, "■ 場所別件数")
+            row += 1
+            by_loc_m = df_month.groupby("場所")["ID"].count().reset_index().sort_values("ID", ascending=False)
+            for _, r in by_loc_m.iterrows():
+                sheet.write(row, col, f"- {r['場所']}：{r['ID']} 件")
+                row += 1
+            row += 1
+
+            # カテゴリ別
+            sheet.write(row, col, "■ カテゴリ別件数")
+            row += 1
+            by_cat_m = df_month.groupby("カテゴリ")["ID"].count().reset_index().sort_values("ID", ascending=False)
+            for _, r in by_cat_m.iterrows():
+                sheet.write(row, col, f"- {r['カテゴリ']}：{r['ID']} 件")
+                row += 1
+            row += 1
+
+            # 会社別
+            sheet.write(row, col, "■ 会社別件数")
+            row += 1
+            by_company_m = df_month.groupby("会社名")["ID"].count().reset_index().sort_values("ID", ascending=False)
+            for _, r in by_company_m.iterrows():
+                sheet.write(row, col, f"- {r['会社名']}：{r['ID']} 件")
+                row += 1
+            row += 2
+
+            # ---- グラフ ----
+            sheet.write(row, col, f"【{month} グラフ】")
+            row += 2
+
+            fig_time_m = None
+            fig_week_m = None
+            fig_loc_m = None
+            fig_cat_m = None
+            fig_company_m = None
+
+            if not df_month.empty:
+                fig_time_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="時間帯")
+                plt.title(f"{month} 時間帯別件数")
+                plt.xticks(rotation=90)
+
+                fig_week_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="曜日")
+                plt.title(f"{month} 曜日別件数")
+                plt.xticks(rotation=90)
+
+                fig_loc_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="場所")
+                plt.title(f"{month} 場所別件数")
+                plt.xticks(rotation=90)
+
+                fig_cat_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="カテゴリ")
+                plt.title(f"{month} カテゴリ別件数")
+                plt.xticks(rotation=90)
+
+                fig_company_m = plt.figure(figsize=(8, 4))
+                sns.countplot(data=df_month, x="会社名")
+                plt.title(f"{month} 会社別件数")
+                plt.xticks(rotation=90)
+
+            for title, fig in [
+                (f"{month} 時間帯別件数", fig_time_m),
+                (f"{month} 曜日別件数", fig_week_m),
+                (f"{month} 場所別件数", fig_loc_m),
+                (f"{month} カテゴリ別件数", fig_cat_m),
+                (f"{month} 会社別件数", fig_company_m),
+            ]:
+                if fig:
+                    png = fig_to_png_bytes(fig)
+                    sheet.insert_image(row, col, title + ".png", {"image_data": png})
+                    row += 20
+
+            # ---- ヒートマップ ----
+            sheet.write(row, col, f"【{month} ヒートマップ】")
+            row += 2
+
+            pivot_week_m = df_month.pivot_table(index="曜日", columns="時間帯", aggfunc="size", fill_value=0)
+            pivot_loc_m = df_month.pivot_table(index="場所", columns="時間帯", aggfunc="size", fill_value=0)
+
+            if not pivot_week_m.empty:
+                fig_hw_m, ax = plt.subplots(figsize=(10, 4))
+                sns.heatmap(pivot_week_m, cmap="Reds", annot=True, fmt="d", ax=ax)
+                ax.set_title(f"{month} 曜日×時間帯")
+                png = fig_to_png_bytes(fig_hw_m)
+                sheet.insert_image(row, col, f"{month}_heat_week.png", {"image_data": png})
+                row += 20
+
+            if not pivot_loc_m.empty:
+                fig_hl_m, ax = plt.subplots(figsize=(10, 4))
+                sns.heatmap(pivot_loc_m, cmap="Reds", annot=True, fmt="d", ax=ax)
+                ax.set_title(f"{month} 場所×時間帯")
+                png = fig_to_png_bytes(fig_hl_m)
+                sheet.insert_image(row, col, f"{month}_heat_loc.png", {"image_data": png})
+                row += 20
+
     return output.getvalue()
 
 excel_data = to_excel_with_charts(
@@ -312,10 +445,11 @@ excel_data = to_excel_with_charts(
     fig_heat_week,
     fig_heat_loc,
     fig_company_heat,
+    monthly_counts,
 )
 
 st.download_button(
-    label="📥 Excel ダウンロード（グラフ・ヒートマップ付き）",
+    label="📥 Excel ダウンロード（グラフ・ヒートマップ・月別シート付き）",
     data=excel_data,
     file_name="HHK分析_グラフ付き.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
