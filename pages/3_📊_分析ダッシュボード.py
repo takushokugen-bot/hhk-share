@@ -12,17 +12,11 @@ import matplotlib.font_manager as fm
 
 font_path = "fonts/ipaexg.ttf"  # ← 弦のフォルダと一致
 
-# フォントを強制登録（Cloud で必須）
 fm.fontManager.addfont(font_path)
-
-# フォントプロパティ取得
 jp_font = fm.FontProperties(fname=font_path)
 
-# Matplotlib に適用
 plt.rcParams["font.family"] = jp_font.get_name()
 plt.rcParams["axes.unicode_minus"] = False
-
-# Seaborn にも適用
 sns.set(font=jp_font.get_name())
 
 # ============================
@@ -70,7 +64,6 @@ df = pd.DataFrame([
 
 df["時間帯"] = df["発生日時"].dt.hour
 
-# 日本語曜日マップ
 weekday_map = {
     "Monday": "月",
     "Tuesday": "火",
@@ -80,7 +73,6 @@ weekday_map = {
     "Saturday": "土",
     "Sunday": "日",
 }
-
 df["曜日"] = df["発生日時"].dt.day_name().map(weekday_map)
 df["月"] = df["発生日時"].dt.to_period("M").astype(str)
 
@@ -122,8 +114,9 @@ st.write(f"📌 抽出件数：{len(filtered)} 件")
 if filtered.empty:
     st.warning("この条件ではデータがありません。")
     st.stop()
+
 # ============================
-# 🤖 AI要約（要約だけ先に実装）
+# 🤖 AI要約（期間全体）
 # ============================
 
 from modules.ai_analysis import summarize_reports
@@ -146,6 +139,20 @@ monthly_counts = (
     .reset_index()
     .sort_values("月")
 )
+
+# ============================
+# 月別AI要約生成
+# ============================
+
+def generate_monthly_ai_summaries(df_all: pd.DataFrame):
+    summaries = {}
+    df_all = df_all.copy()
+    df_all["year_month"] = df_all["発生日時"].dt.to_period("M")
+    for ym, group in df_all.groupby("year_month"):
+        summaries[str(ym)] = summarize_reports(group)
+    return summaries
+
+monthly_ai = generate_monthly_ai_summaries(filtered)
 
 # ============================
 # カード風説明
@@ -250,12 +257,11 @@ if not pivot_loc.empty:
     st.pyplot(fig_heat_loc)
 
 # ============================
-# 会社 × 場所 × 時間帯 ヒートマップ（完全修正版）
+# 会社 × 場所 × 時間帯 ヒートマップ
 # ============================
 
 st.subheader("🔥 会社 × 場所 × 時間帯 ヒートマップ")
 
-# 「すべて」でも pivot を作る
 df_company = filtered.copy() if company_filter == "すべて" else filtered[filtered["会社名"] == company_filter]
 
 pivot_company = df_company.pivot_table(
@@ -265,11 +271,9 @@ pivot_company = df_company.pivot_table(
     fill_value=0
 )
 
-# pivot が空ならダミーを入れる（Excel 出力が壊れないように）
 if pivot_company.empty:
     pivot_company = pd.DataFrame([[0]], index=["データなし"], columns=["データなし"])
 
-# ヒートマップ生成
 fig_company_heat, ax = plt.subplots(figsize=(12, 6))
 sns.heatmap(pivot_company, cmap="Reds", annot=True, fmt="d", ax=ax)
 ax.set_title(f"{company_filter}：場所 × 時間帯 ヒートマップ")
@@ -290,7 +294,8 @@ def to_excel_with_charts(df_export, p_week, p_loc,
                          f_company,
                          fh_week, fh_loc,
                          fh_company,
-                         monthly_counts):
+                         monthly_counts,
+                         monthly_ai):
 
     output = BytesIO()
 
@@ -327,7 +332,9 @@ def to_excel_with_charts(df_export, p_week, p_loc,
         insert_if(fh_loc, "場所×時間帯ヒートマップ")
         insert_if(fh_company, "会社×場所×時間帯ヒートマップ")
 
-        # 4. 月別シート（サマリ → グラフ → ヒートマップ）
+        # 4. 月別シート（AI要約 → サマリ → グラフ → ヒートマップ）
+
+        wrap = workbook.add_format({"text_wrap": True})
 
         for month in monthly_counts["月"].unique():
 
@@ -336,6 +343,13 @@ def to_excel_with_charts(df_export, p_week, p_loc,
 
             row = 1
             col = 1
+
+            # ---- AI要約 ----
+            ai_text = monthly_ai.get(month, "（この月のAI要約はありません）")
+            sheet.write(row, col, f"【{month} AI要約】")
+            row += 2
+            sheet.write(row, col, ai_text, wrap)
+            row += 4
 
             # ---- サマリ ----
             sheet.write(row, col, f"【{month} サマリ】")
@@ -457,11 +471,12 @@ excel_data = to_excel_with_charts(
     fig_heat_loc,
     fig_company_heat,
     monthly_counts,
+    monthly_ai,
 )
 
 st.download_button(
-    label="📥 Excel ダウンロード（グラフ・ヒートマップ・月別シート付き）",
+    label="📥 Excel ダウンロード（AI要約・グラフ・ヒートマップ・月別シート付き）",
     data=excel_data,
-    file_name="HHK分析_グラフ付き.xlsx",
+    file_name="HHK分析_AI要約付き.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
