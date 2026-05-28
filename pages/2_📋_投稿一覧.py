@@ -34,12 +34,15 @@ if "page" not in st.session_state:
     st.session_state.page = 0
 
 # ============================
-# データ取得（← company を追加）
+# データ取得
 # ============================
 
 reports = (
     supabase.table("hhk_reports")
-    .select("id, reported_at, description, reporter, company, photo_url, locations(name), categories(name)")
+    .select(
+        "id, reported_at, description, reporter, company, photo_url, "
+        "locations(name), categories(name)"
+    )
     .order("reported_at", desc=True)
     .execute()
     .data
@@ -50,7 +53,7 @@ if not reports:
     st.stop()
 
 # ============================
-# DataFrame 化（← 会社名を追加）
+# DataFrame 化
 # ============================
 
 df = pd.DataFrame([
@@ -61,10 +64,10 @@ df = pd.DataFrame([
         "月": pd.to_datetime(r["reported_at"]).month,
         "時間帯": pd.to_datetime(r["reported_at"]).hour,
         "曜日": pd.to_datetime(r["reported_at"]).day_name(),
-        "場所": r["locations"]["name"] if r["locations"] else "",
-        "カテゴリ": r["categories"]["name"] if r["categories"] else "",
-        "内容": r["description"],
-        "投稿者": r["reporter"],
+        "場所": r["locations"]["name"] if r["locations"] else "（未設定）",
+        "カテゴリ": r["categories"]["name"] if r["categories"] else "（未設定）",
+        "内容": r["description"] if r["description"] else "（未入力）",
+        "投稿者": r["reporter"] if r["reporter"] else "（未入力）",
         "会社名": r["company"] if r["company"] else "（未入力）",
         "写真URL": r["photo_url"],
     }
