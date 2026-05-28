@@ -447,4 +447,8 @@ excel_data = to_excel_with_charts(
 )
 
 st.download_button(
-    label="📥 Excel ダウンロード（グラフ・ヒートマップ・月別シート
+    label="📥 Excel ダウンロード（グラフ・ヒートマップ・月別シート付き）",
+    data=excel_data,
+    file_name="HHK分析_グラフ付き.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
