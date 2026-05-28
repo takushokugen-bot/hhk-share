@@ -122,6 +122,19 @@ st.write(f"📌 抽出件数：{len(filtered)} 件")
 if filtered.empty:
     st.warning("この条件ではデータがありません。")
     st.stop()
+# ============================
+# 🤖 AI要約（要約だけ先に実装）
+# ============================
+
+from modules.ai_analysis import summarize_reports
+
+st.subheader("🤖 AI要約")
+
+if st.button("AIで要約を生成"):
+    with st.spinner("AIが要約を作成中..."):
+        summary_text = summarize_reports(filtered)
+    st.markdown("### 📝 要約結果")
+    st.markdown(summary_text)
 
 # ============================
 # 月次KPI用（月情報）
