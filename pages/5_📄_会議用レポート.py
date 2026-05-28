@@ -9,6 +9,7 @@ from io import BytesIO
 import datetime as dt
 
 from modules.font import *   # ← フォント設定は必ず最後に import
+from modules.ai_analysis import summarize_reports   # ← AI要約
 
 # ============================
 # Supabase 接続
@@ -132,6 +133,23 @@ fig_heat_week = plot_heatmap(pivot_week, "曜日 × 時間帯 ヒートマップ
 fig_heat_loc = plot_heatmap(pivot_loc, "場所 × 時間帯 ヒートマップ")
 
 # ============================
+# 🤖 AI要約（期間全体）
+# ============================
+
+with st.spinner("AIが期間全体の要約を作成中..."):
+    ai_summary_all = summarize_reports(df)
+
+# ============================
+# 🤖 月別AI要約
+# ============================
+
+monthly_ai = {}
+for month in monthly_counts["月"].unique():
+    df_month = df[df["月"] == month]
+    with st.spinner(f"AIが {month} の要約を作成中..."):
+        monthly_ai[month] = summarize_reports(df_month)
+
+# ============================
 # Word レポート生成
 # ============================
 
@@ -140,6 +158,11 @@ def build_doc(df_export):
 
     doc.add_heading("HHK（ヒヤリハット）振り返りレポート", level=1)
     doc.add_paragraph(f"期間：{start_date} ～ {end_date}")
+    doc.add_paragraph("")
+
+    # 0. AI要約（期間全体）
+    doc.add_heading("0. AI要約（期間全体）", level=2)
+    doc.add_paragraph(ai_summary_all)
     doc.add_paragraph("")
 
     # 1. KPI
@@ -207,10 +230,14 @@ def build_doc(df_export):
         doc.add_paragraph(f"投稿者：{row['投稿者']}")
         doc.add_paragraph("-" * 40)
 
-    # 6. 月別サマリ・月別グラフ
-    doc.add_heading("6. 月別サマリ・月別グラフ", level=2)
+    # 6. 月別サマリ・月別AI要約・月別グラフ
+    doc.add_heading("6. 月別サマリ・AI要約・月別グラフ", level=2)
 
     for month in monthly_counts["月"].unique():
+        doc.add_heading(f"■ {month} のAI要約", level=3)
+        doc.add_paragraph(monthly_ai[month])
+        doc.add_paragraph("")
+
         doc.add_heading(f"■ {month} のサマリ", level=3)
 
         df_month = df_export[df_export["月"] == month]
