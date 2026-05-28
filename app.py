@@ -1,3 +1,4 @@
+from modules.font import *
 import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import seaborn as sns
