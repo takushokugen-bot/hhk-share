@@ -1,7 +1,7 @@
 from modules.font import *
 import streamlit as st
 
-st.title("HHK（ヒヤリハット）共有システム")
+st.title("辰巳商会　HHK（ヒヤリハット）共有システム")
 st.write("左のメニューから操作を選んでください。")
 
 # ============================
