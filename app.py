@@ -1,7 +1,24 @@
 from modules.font import *
 import streamlit as st
 
-st.title("辰巳商会　HHK（ヒヤリハット）共有システム")
+# ============================
+# 企業システム風タイトル（中央寄せ・大きめ）
+# ============================
+
+st.markdown("""
+<div style="
+    text-align:center;
+    font-size:32px;
+    font-weight:bold;
+    line-height:1.4;
+    margin-top:10px;
+    margin-bottom:20px;
+">
+辰巳商会<br>
+<span style="font-size:26px;">HHK（ヒヤリハット）共有システム</span>
+</div>
+""", unsafe_allow_html=True)
+
 st.write("左のメニューから操作を選んでください。")
 
 # ============================
