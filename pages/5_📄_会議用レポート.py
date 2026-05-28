@@ -59,6 +59,7 @@ df = pd.DataFrame([
     for r in reports
 ])
 
+# 期間で絞る
 df = df[
     (df["発生日時"].dt.date >= start_date) &
     (df["発生日時"].dt.date <= end_date)
@@ -69,28 +70,26 @@ if df.empty:
     st.stop()
 
 # ============================
-# KPI 計算
+# 月次KPI（件数一覧＋増減率）
 # ============================
 
-df["日付"] = df["発生日時"].dt.date
+df["月"] = df["発生日時"].dt.to_period("M").astype(str)
 
-first_day_this_month = today.replace(day=1)
-first_day_last_month = (first_day_this_month - dt.timedelta(days=1)).replace(day=1)
-last_day_last_month = first_day_this_month - dt.timedelta(days=1)
+monthly_counts = df.groupby("月")["ID"].count().reset_index()
+monthly_counts = monthly_counts.sort_values("月")
 
-this_month_df = df[df["日付"] >= first_day_this_month]
-this_month_count = len(this_month_df)
+monthly_counts["前月比"] = monthly_counts["ID"].pct_change() * 100
+monthly_counts["前月比"] = monthly_counts["前月比"].apply(
+    lambda x: f"{x:.1f}%" if pd.notnull(x) else "—"
+)
 
-last_month_df = df[
-    (df["日付"] >= first_day_last_month) &
-    (df["日付"] <= last_day_last_month)
-]
-last_month_count = len(last_month_df)
-
-if last_month_count == 0:
-    mom = "N/A"
-else:
-    mom = f"{((this_month_count - last_month_count) / last_month_count) * 100:.1f}%"
+# 月次推移グラフ
+fig_monthly = plt.figure(figsize=(8, 4))
+plt.plot(monthly_counts["月"], monthly_counts["ID"], marker="o")
+plt.title("月次件数推移")
+plt.xlabel("月")
+plt.ylabel("件数")
+plt.grid(True)
 
 # ============================
 # グラフ生成
@@ -141,11 +140,17 @@ def build_doc(df_export):
     doc.add_paragraph(f"期間：{start_date} ～ {end_date}")
     doc.add_paragraph("")
 
-    # KPI
-    doc.add_heading("1. KPI（重要指標）", level=2)
-    doc.add_paragraph(f"今月の件数：{this_month_count} 件")
-    doc.add_paragraph(f"先月の件数：{last_month_count} 件")
-    doc.add_paragraph(f"先月比：{mom}")
+    # KPI（完全版）
+    doc.add_heading("1. KPI（重要指標：月次比較）", level=2)
+    doc.add_paragraph("■ 月ごとの件数・前月比")
+    for _, row in monthly_counts.iterrows():
+        doc.add_paragraph(
+            f"- {row['月']}：{row['ID']} 件（前月比：{row['前月比']}）",
+            style="List Bullet"
+        )
+
+    doc.add_paragraph("■ 月次件数推移グラフ")
+    doc.add_picture(fig_to_png_bytes(fig_monthly), width=Inches(6))
     doc.add_paragraph("")
 
     # 集計サマリ
@@ -166,7 +171,7 @@ def build_doc(df_export):
         doc.add_paragraph(f"- {row['カテゴリ']}：{row['ID']} 件", style="List Bullet")
     doc.add_paragraph("")
 
-    # 会社別（追加）
+    # 会社別
     by_company = df_export.groupby("会社名")["ID"].count().reset_index().sort_values("ID", ascending=False)
     doc.add_paragraph("■ 会社別件数")
     for _, row in by_company.iterrows():
