@@ -67,21 +67,21 @@ if st.button("📤 投稿する"):
     category_id = next((c["id"] for c in categories if c["name"] == category), None)
 
     # ============================
-    # 写真アップロード（修正版）
+    # 写真アップロード（完全版）
     # ============================
 
     photo_url = None
     if photo:
         file_bytes = photo.getvalue()
-        file_path = f"hhk_photos/{datetime.now().timestamp()}_{photo.name}"
+        file_path = f"{datetime.now().timestamp()}_{photo.name}"
 
-        supabase.storage.from_("hhk").upload(
+        supabase.storage.from_("hhk_photos").upload(
             file_path,
             file_bytes,
             {"content-type": photo.type}
         )
 
-        photo_url = supabase.storage.from_("hhk").get_public_url(file_path)
+        photo_url = supabase.storage.from_("hhk_photos").get_public_url(file_path)
 
     # ============================
     # DB へ登録
