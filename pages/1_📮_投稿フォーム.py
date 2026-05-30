@@ -73,15 +73,20 @@ if st.button("📤 投稿する"):
     photo_url = None
     if photo:
         file_bytes = photo.getvalue()
-        file_path = f"{datetime.now().timestamp()}_{photo.name}"
+        timestamp = datetime.now().timestamp()
+        filename = f"{timestamp}_{photo.name}"
 
+        # MIME タイプが None の場合に備える
+        content_type = photo.type or "application/octet-stream"
+
+        # バケット名は from_() で指定するので filename にバケット名は含めない
         supabase.storage.from_("hhk_photos").upload(
-            file_path,
+            filename,
             file_bytes,
-            {"content-type": photo.type}
+            {"content-type": content_type}
         )
 
-        photo_url = supabase.storage.from_("hhk_photos").get_public_url(file_path)
+        photo_url = supabase.storage.from_("hhk_photos").get_public_url(filename)
 
     # ============================
     # DB へ登録
