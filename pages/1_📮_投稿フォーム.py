@@ -66,14 +66,27 @@ if st.button("📤 投稿する"):
     location_id = next((l["id"] for l in locations if l["name"] == location), None)
     category_id = next((c["id"] for c in categories if c["name"] == category), None)
 
-    # 写真アップロード
+    # ============================
+    # 写真アップロード（修正版）
+    # ============================
+
     photo_url = None
     if photo:
+        file_bytes = photo.getvalue()
         file_path = f"hhk_photos/{datetime.now().timestamp()}_{photo.name}"
-        supabase.storage.from_("hhk").upload(file_path, photo)
+
+        supabase.storage.from_("hhk").upload(
+            file_path,
+            file_bytes,
+            {"content-type": photo.type}
+        )
+
         photo_url = supabase.storage.from_("hhk").get_public_url(file_path)
 
+    # ============================
     # DB へ登録
+    # ============================
+
     supabase.table("hhk_reports").insert({
         "reported_at": reported_at.isoformat(),
         "location_id": location_id,
