@@ -26,21 +26,13 @@ if auto_refresh:
     st.rerun()
 
 # ============================
-# ページネーション設定
-# ============================
-
-PAGE_SIZE = 50
-if "page" not in st.session_state:
-    st.session_state.page = 0
-
-# ============================
 # データ取得
 # ============================
 
 reports = (
     supabase.table("hhk_reports")
     .select(
-        "id, reported_at, description, reporter, company, photo_url, "
+        "id, reported_at, description, reporter, company, "
         "locations(name), categories(name)"
     )
     .order("reported_at", desc=True)
@@ -53,7 +45,7 @@ if not reports:
     st.stop()
 
 # ============================
-# DataFrame 化
+# DataFrame 化（写真URL削除）
 # ============================
 
 df = pd.DataFrame([
@@ -69,7 +61,6 @@ df = pd.DataFrame([
         "内容": r["description"] if r["description"] else "（未入力）",
         "投稿者": r["reporter"] if r["reporter"] else "（未入力）",
         "会社名": r["company"] if r["company"] else "（未入力）",
-        "写真URL": r["photo_url"],
     }
     for r in reports
 ])
@@ -119,8 +110,12 @@ total = len(filtered)
 st.write(f"📌 抽出件数：{total} 件")
 
 # ============================
-# ページネーション適用
+# ページネーション
 # ============================
+
+PAGE_SIZE = 50
+if "page" not in st.session_state:
+    st.session_state.page = 0
 
 max_page = max((total - 1) // PAGE_SIZE, 0)
 
@@ -165,17 +160,3 @@ for _, row in page_df.iterrows():
             supabase.table("hhk_reports").delete().eq("id", row["ID"]).execute()
             st.success("削除しました")
             st.rerun()
-
-# ============================
-# 写真表示
-# ============================
-
-st.subheader("🖼 写真表示")
-
-for _, row in page_df.iterrows():
-    if st.button(f"写真を見る（ID:{row['ID']}）", key=f"view_{row['ID']}"):
-        url = row["写真URL"]
-        if isinstance(url, str) and url.startswith("http"):
-            st.image(url, width=350)
-        else:
-            st.info("写真はありません。")
