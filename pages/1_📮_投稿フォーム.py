@@ -47,11 +47,10 @@ if st.button("📤 投稿する"):
         filename = f"{timestamp}_{photo.name}"
         content_type = photo.type or "application/octet-stream"
 
-        # ★ SDK 正式対応版：位置引数ではなくキーワード引数で渡す
         supabase.storage.from_("hhk_photos").upload(
             path=filename,
             file=file_bytes,
-            file_options={"content-type": content_type}
+            file_options={"contentType": content_type}  # ← ここ
         )
 
         photo_url = supabase.storage.from_("hhk_photos").get_public_url(filename)
