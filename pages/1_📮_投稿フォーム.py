@@ -47,11 +47,11 @@ if st.button("📤 投稿する"):
         filename = f"{timestamp}_{photo.name}"
         content_type = photo.type or "application/octet-stream"
 
-        # ★ Supabase Storage 正式対応版（これが正解）
+        # ★ Supabase Storage 正式対応版（headers を使う）
         supabase.storage.from_("hhk_photos").upload(
-            path=filename,
-            file=file_bytes,
-            file_options={"content-type": content_type}  # ← ここが最重要
+            filename,
+            file_bytes,
+            {"content-type": content_type}  # ← これが正しい
         )
 
         photo_url = supabase.storage.from_("hhk_photos").get_public_url(filename)
