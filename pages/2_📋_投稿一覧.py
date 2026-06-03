@@ -45,7 +45,7 @@ if not reports:
     st.stop()
 
 # ============================
-# DataFrame 化（写真URL削除）
+# DataFrame 化（写真なし）
 # ============================
 
 df = pd.DataFrame([
@@ -141,7 +141,7 @@ page_df = filtered.iloc[start:end]
 
 st.subheader("📊 投稿テーブル（削除可能）")
 
-for _, row in page_df.iterrows():
+for idx, row in page_df.iterrows():
     colA, colB = st.columns([8, 1])
 
     with colA:
@@ -156,7 +156,7 @@ for _, row in page_df.iterrows():
         )
 
     with colB:
-        if st.button("🗑 削除", key=f"delete_{row['ID']}"):
+        if st.button("🗑 削除", key=f"delete_{row['ID']}_{idx}"):
             supabase.table("hhk_reports").delete().eq("id", row["ID"]).execute()
             st.success("削除しました")
             st.rerun()
