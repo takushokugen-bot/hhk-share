@@ -67,22 +67,20 @@ if st.button("📤 投稿する"):
     category_id = next((c["id"] for c in categories if c["name"] == category), None)
 
     # ============================
-    # 写真アップロード（完全版）
+    # 写真アップロード（完全修正版）
     # ============================
 
     photo_url = None
     if photo:
-        file_bytes = photo.getvalue()
         timestamp = datetime.now().timestamp()
         filename = f"{timestamp}_{photo.name}"
 
-        # MIME タイプが None の場合に備える
         content_type = photo.type or "application/octet-stream"
 
-        # バケット名は from_() で指定するので filename にバケット名は含めない
+        # ここで bytes ではなく photo オブジェクトをそのまま渡す
         supabase.storage.from_("hhk_photos").upload(
             filename,
-            file_bytes,
+            photo,
             {"content-type": content_type}
         )
 
