@@ -3,11 +3,19 @@ from supabase import create_client, Client
 from datetime import datetime
 from modules.font import *
 
+# ============================
+# Supabase 接続
+# ============================
+
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.title("📝 HHK（ヒヤリハット）投稿フォーム")
+
+# ============================
+# マスタ取得
+# ============================
 
 locations = supabase.table("locations").select("id, name").execute().data
 categories = supabase.table("categories").select("id, name").execute().data
@@ -17,6 +25,10 @@ location_names = ["（未選択）"] + [l["name"] for l in locations]
 category_names = ["（未選択）"] + [c["name"] for c in categories]
 company_names = ["（未選択）"] + [c["name"] for c in companies]
 
+# ============================
+# 入力フォーム
+# ============================
+
 reported_at = st.datetime_input("発生日時", datetime.now())
 location = st.selectbox("場所（必須）", location_names)
 category = st.selectbox("カテゴリ（必須）", category_names)
@@ -25,36 +37,60 @@ description = st.text_area("内容（必須）")
 reporter = st.text_input("投稿者名（任意）")
 photo = st.file_uploader("写真（任意）", type=["jpg", "png"])
 
+# ============================
+# 投稿処理
+# ============================
+
 if st.button("📤 投稿する"):
 
     errors = []
-    if location == "（未選択）": errors.append("場所は必須です。")
-    if category == "（未選択）": errors.append("カテゴリは必須です。")
-    if company == "（未選択）": errors.append("会社名は必須です。")
-    if not description.strip(): errors.append("内容は必須です。")
+
+    if location == "（未選択）":
+        errors.append("場所は必須です。")
+
+    if category == "（未選択）":
+        errors.append("カテゴリは必須です。")
+
+    if company == "（未選択）":
+        errors.append("会社名は必須です。")
+
+    if not description.strip():
+        errors.append("内容は必須です。")
 
     if errors:
-        for e in errors: st.error(e)
+        for e in errors:
+            st.error(e)
         st.stop()
 
+    # ID 取得
     location_id = next((l["id"] for l in locations if l["name"] == location), None)
     category_id = next((c["id"] for c in categories if c["name"] == category), None)
+
+    # ============================
+    # 写真アップロード（完全版）
+    # ============================
 
     photo_url = None
     if photo:
         file_bytes = photo.getvalue()
         timestamp = datetime.now().timestamp()
         filename = f"{timestamp}_{photo.name}"
+
+        # MIME タイプが None の場合に備える
         content_type = photo.type or "application/octet-stream"
 
-        # ★ Supabase Storage 正式対応版（headers を使う）
+        # ★ Supabase Storage 正式対応版（headers として渡す）
         supabase.storage.from_("hhk_photos").upload(
             filename,
             file_bytes,
-            {"content-type": content_type}  # ← これが正しい
+            {"content-type": content_type}
         )
 
         photo_url = supabase.storage.from_("hhk_photos").get_public_url(filename)
+
+    # ============================
+    # DB へ登録
+    # ============================
 
     supabase.table("hhk_reports").insert({
         "reported_at": reported_at.isoformat(),
